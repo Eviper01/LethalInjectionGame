@@ -76,6 +76,7 @@ function Create_AI(ip) {
   edit_log: function(message) {
     data.players[this.connection].log.push(message);
   },
+  alert: function() {},
   };
   data.players[ip] = AI;
   };
@@ -89,7 +90,8 @@ function generate_bank() {
 //Contract Broker methods
 function Generate_Robbery_Mission() {
   target = Generate_Random_AI_Bank_Account();
-  //add this to the
+  //add this to the database of missions
+  //create somekind of listner that pays out the owner of the connctract when the account is emptied
 }
 function Generate_Transfer_Mission() {
   //create two accounts
@@ -101,10 +103,11 @@ function Generate_Random_AI_Bank_Account() {
   account_name = Math.floor(Math.random()*100000000);
   data.global.bankaccounts[account_name] = balance;
   reward = random_normal(1200,250,1000);
+  return account_name
 }
 
 
-//Also how about attacks being depended on ports opened by actions the victom makes
+//Also how about attacks being depended on ports opened by actions the victim makes
 
 // client will diplay info when passed -->   socket.emit("broadcast",info);
 io.on('connect', function(socket) {
@@ -151,6 +154,22 @@ io.on('connect', function(socket) {
                 }, 4000);
           }, 1000);
 
+        },
+        ecm_overdrive: function(ip_in) {
+          socket.emit("broadcast", "running jamming attack on connected host")
+          attack = setInterval(function () {
+            var result           = '';
+            var characters       = 'ABCDEF GHIJKLMNOPQRSTUVWXYZ a bcd efgh ijkl mnop qrstu vwxyz 0123456789!@#$%^&*()_+-=/<>:"{}"';
+            var charactersLength = characters.length;
+            for ( var k = 0; k < random_normal(300,25,250); k++ ) {
+               result += characters.charAt(Math.floor(Math.random() * charactersLength));
+            }
+            data.players[data.players[ip_in].connection].alert(result)
+          }, 10);
+          setTimeout(function () {
+            clearInterval(attack);
+          }, 1000);
+          data.players[data.players[ip_in].connection].disconnect();
         }
       },
       virus: [],
@@ -166,7 +185,7 @@ io.on('connect', function(socket) {
       },
       disconnect: function() {
         this.connection = this.ip;
-        this.permission = "user"
+        this.permission = "root"
       },
       connect: function(ip_address) {
         this.connection = ip_address;
