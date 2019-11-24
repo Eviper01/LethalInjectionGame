@@ -17,6 +17,24 @@ server.listen(25444, function () {
   data.players.whois.index = function() {return ["Welcome to the Whois, Registered ip:\n CommSecAuto-Banking \n Contract-Broker" , global_dispatcher]}
   console.log("server running on 25444");
 });
+//helper functions
+
+function random_normal(mean,stdev,samples){
+  b = mean + Math.sqrt(3*samples)*stdev ;
+  a = mean - Math.sqrt(3*samples)*stdev;
+  sample_mean = 0
+  for(var i=0; i < samples; i++){
+      sample = (Math.random()*(b-a)) + a
+      sample_mean += sample
+  };
+  if (sample_mean/samples < 0) {
+    return random_normal(mean,stdev,samples)
+  }
+  else {
+    return Math.floor(sample_mean/samples)
+  }
+};
+
 //backend init - note dispatcher system could be used to send custom errors
 var global_dispatcher = {  "help":"help",
                             "logs":"logs",
@@ -32,6 +50,7 @@ var data = {};
 function init_database() {
   data["players"] = {};
   data["global"] = {bankaccounts: {}};
+  data["missions"] = {}
 };
 function Create_AI(ip) {
   AI = {
@@ -41,7 +60,8 @@ function Create_AI(ip) {
   virus: [],
   index: function() {
     //this is gonna need to be a core gamplay design
-    return "/"
+    return ["/", global_dispatcher]
+
   },
   print_log: function() {
       out = "*****"
@@ -64,7 +84,27 @@ function generate_bank() {
   Create_AI("CommSecAuto-Banking");
   data.players["CommSecAuto-Banking"].index = function() {return ["Welcome To CommSec: \nlogin\nregister ", {help:"bank_help", login:"bank_login", register:"bank_register","cancel":"global_cancel"}]}
 
+};
+
+//Contract Broker methods
+function Generate_Robbery_Mission() {
+  target = Generate_Random_AI_Bank_Account();
+  //add this to the
 }
+function Generate_Transfer_Mission() {
+  //create two accounts
+  //fire success when account is empty
+}
+
+function Generate_Random_AI_Bank_Account() {
+  balance = random_normal(1000,300,1000);
+  account_name = Math.floor(Math.random()*100000000);
+  data.global.bankaccounts[account_name] = balance;
+  reward = random_normal(1200,250,1000);
+}
+
+
+//Also how about attacks being depended on ports opened by actions the victom makes
 
 // client will diplay info when passed -->   socket.emit("broadcast",info);
 io.on('connect', function(socket) {
