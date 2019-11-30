@@ -13,7 +13,27 @@ server.listen(25444, function () {
   Create_AI("whois");
   Create_AI("Contract-Broker");
   generate_bank()
-  data.players["Contract-Broker"].index = function() {return ["Currently we dont offer contracts", global_dispatcher]}
+  data.players["Contract-Broker"].index = function() {
+    desc = ""
+    for(x in Object.keys(data.missions)) {
+      if(data.missions[Object.keys(data.missions)[x]].owner == null) {
+        desc += "\n" + data.missions[Object.keys(data.missions)[x]].format_mission();
+      }
+    };
+    desc += "\ntype claim + id for contract or type cancel to quit"
+    return [desc, {claim:"contract_take", cancel:"global_cancel"}]};
+
+// need to add some kind of periodic or event driven mission generation
+Generate_Robbery_Mission();
+Generate_Robbery_Mission();
+Generate_Robbery_Mission();
+
+setInterval(function () {
+  Generate_Robbery_Mission();
+  Generate_Robbery_Mission();
+  Generate_Robbery_Mission();
+}, 3e5);
+
   data.players.whois.index = function() {return ["Welcome to the Whois, Registered ip:\n CommSecAuto-Banking \n Contract-Broker" , global_dispatcher]}
   console.log("server running on 25444");
 });
@@ -45,6 +65,8 @@ var global_dispatcher = {  "help":"help",
                             "editlogs": "edit_logs",
                             "index":"index",
                             "run":"run",
+                            "bankinfo":"bank_details",
+                            "contract": "contract_details",
                             "data":"control_data"}
 var data = {};
 function init_database() {
@@ -76,7 +98,8 @@ function Create_AI(ip) {
   edit_log: function(message) {
     data.players[this.connection].log.push(message);
   },
-  alert: function() {},
+  alert: function(a) {},
+  disconnect: function() {},
   };
   data.players[ip] = AI;
   };
@@ -88,10 +111,38 @@ function generate_bank() {
 };
 
 //Contract Broker methods
+
+//spooky behvaiour when it comes to contract payouts
 function Generate_Robbery_Mission() {
-  target = Generate_Random_AI_Bank_Account();
-  //add this to the database of missions
-  //create somekind of listner that pays out the owner of the connctract when the account is emptied
+  var target = Generate_Random_AI_Bank_Account();
+  reward = random_normal(1200,250,1000);
+  mission_id = Math.floor(Math.random()*100000000);
+  mission_object = {
+    reward:reward,
+    target:target,
+    mission_id:mission_id,
+    owner:null,
+    format_mission: function() {
+      return "Contract "+ this.mission_id + ": Empty account " + this.target + " Reward: $" + this.reward
+    },
+    contract_payout: function() {
+      try {
+        // need to delete the contract on completion - this is so fucking bugged
+      owner = data.missions[this.mission_id].owner;
+      data.players[owner].alert("Mission Sucessful, Transfering: $" + this.reward + " to account " + data.players[owner].bank_details);
+      data.global.bankaccounts[data.players[owner].bank_details].value += this.reward;
+      data.players[owner].log.push(owner + " Recieved $" + this.reward + " into account: " + data.players[owner].bank_details)
+      delete data.missions[this.mission_id];}
+      catch (e) {
+        console.log("Contract expired due to completion by non owner");
+        console.log(e);
+        delete data.missions[this.mission_id];
+          // need to delete the contract on completion
+      }
+  }
+    }
+  data.missions[mission_id] = mission_object;
+  data.global.bankaccounts[target].registerListener(function(){data.missions[mission_id].contract_payout()});
 }
 function Generate_Transfer_Mission() {
   //create two accounts
@@ -100,11 +151,33 @@ function Generate_Transfer_Mission() {
 
 function Generate_Random_AI_Bank_Account() {
   balance = random_normal(1000,300,1000);
-  account_name = Math.floor(Math.random()*100000000);
-  data.global.bankaccounts[account_name] = balance;
-  reward = random_normal(1200,250,1000);
+  account_name = Register_Bank_Account(balance);
   return account_name
 }
+
+function Register_Bank_Account(balance=0) {
+  //this needs to check if the number is unique otherwise big issues
+  account_name = Math.floor(Math.random()*100000000);
+  var account = {vInternal: balance,
+                vListener: function(param) {},
+                set value(val) {
+                  this.vInternal = val
+                  this.vListener(val);
+                },
+                get value() {
+                  return this.vInternal;
+                },
+                registerListener: function(listener) {
+                  this.vListener = listener
+                },
+
+        }
+  data.global.bankaccounts[account_name] = account;
+  return account_name
+
+}
+
+
 
 
 //Also how about attacks being depended on ports opened by actions the victim makes
@@ -118,12 +191,14 @@ io.on('connect', function(socket) {
       connection: socket.id,
       permission: "root",
       log: [],
+      bank_details: null,
       files: {
         rootkit: function(ip_in) {
           socket.emit("broadcast", "running rootkit")
           setTimeout(function() {data.players[ip_in].permission = "root";
           socket.emit("broadcast","success");
           data.players[data.players[ip_in].connection].log.push(ip_in + " logged in as root");
+          socket.emit("Get_Input",global_dispatcher);
         },3000);
         },
         netscan: function(ip_in) {
@@ -151,6 +226,7 @@ io.on('connect', function(socket) {
                   for (x in pwned){
                     socket.emit("broadcast",pwned[x])
                   }
+                  socket.emit("Get_Input",global_dispatcher);
                 }, 4000);
           }, 1000);
 
@@ -168,8 +244,10 @@ io.on('connect', function(socket) {
           }, 10);
           setTimeout(function () {
             clearInterval(attack);
+            socket.emit("Get_Input",global_dispatcher);
           }, 1000);
           data.players[data.players[ip_in].connection].disconnect();
+
         }
       },
       virus: [],
@@ -205,7 +283,7 @@ io.on('connect', function(socket) {
   });
 
   socket.on('help', function(input){
-    var info = "Git Good";
+    var info = "these are some commands {logs, clearlogs, editlogs, run, connect, disconnect, index, ip} \nconnect to the whois for ip information";
     socket.emit("broadcast", info);
     socket.emit("Get_Input",global_dispatcher);
   });
@@ -242,10 +320,9 @@ io.on('connect', function(socket) {
     }
   });
   socket.on('disconnect', function(input){
-    socket.emit("broadcast", "Disconnecting...");
-    setTimeout(function() {data.players[socket.id].disconnect();
-                          socket.emit("broadcast", "Diconnected")
-                          socket.emit("Get_Input",global_dispatcher);},1500);
+    data.players[socket.id].disconnect();
+    socket.emit("broadcast", "Diconnected")
+    socket.emit("Get_Input",global_dispatcher);
 
   });
 
@@ -264,13 +341,22 @@ io.on('connect', function(socket) {
   });
   socket.on('run', function(input){
     try {
-      //this might need to be reenginnered
-    data.players[socket.id].files[input.argument](socket.id);
-    socket.emit("Get_Input",global_dispatcher);} ///this input request is a little bit wacky
+    data.players[socket.id].files[input.argument](socket.id);}
+     ///this input request is a little bit wacky
      catch {
       socket.emit("broadcast","Unknown Program");
       socket.emit("Get_Input",global_dispatcher);
    }
+  });
+  socket.on("bank_details", function(input) {
+    socket.emit("broadcast",data.players[socket.id].bank_details);
+    socket.emit("Get_Input",global_dispatcher);
+
+  });
+  socket.on("contract_details", function(input) {
+    socket.emit("broadcast", "can't really help you there dawg");
+    socket.emit("Get_Input",global_dispatcher);
+
   });
 
 //specific functions for certain AI
@@ -287,7 +373,7 @@ socket.on("global_cancel", function(input){
     if (Object.keys(data.global.bankaccounts).includes(input.argument)) {
     data.players[socket.id].logged_bank_account = input.argument
     socket.emit("broadcast","Logged into: " + input.argument)
-    socket.emit("broadcast", "account has balance: $" + data.global.bankaccounts[input.argument])
+    socket.emit("broadcast", "account has balance: $" + data.global.bankaccounts[input.argument].value)
     data.players["CommSecAuto-Banking"].log.push(socket.id + " logged into account: " + input.argument)
     data.players[socket.id].log.push(socket.id + " logged into account: " + input.argument)
     socket.emit("broadcast", "Type transfer and an account number to initiate transfer")
@@ -301,12 +387,12 @@ socket.on("global_cancel", function(input){
   });
   socket.on("bank_transfer", function(input) {
     if (Object.keys(data.global.bankaccounts).includes(input.argument)) {
-    var transfer_amount = data.global.bankaccounts[data.players[socket.id].logged_bank_account]
-    data.global.bankaccounts[input.argument] += data.global.bankaccounts[data.players[socket.id].logged_bank_account]
+    var transfer_amount = data.global.bankaccounts[data.players[socket.id].logged_bank_account].value
+    data.global.bankaccounts[input.argument].value += data.global.bankaccounts[data.players[socket.id].logged_bank_account].value
     socket.emit("broadcast","Transfered $" + transfer_amount + " from " + data.players[socket.id].logged_bank_account + " to " + input.argument)
     data.players["CommSecAuto-Banking"].log.push(socket.id + " Transfered $" + transfer_amount + " from " + data.players[socket.id].logged_bank_account + " to " + input.argument)
     data.players[socket.id].log.push("Transfered $" + transfer_amount + " from " + data.players[socket.id].logged_bank_account + " to " + input.argument)
-    data.global.bankaccounts[data.players[socket.id].logged_bank_account] = 0
+    data.global.bankaccounts[data.players[socket.id].logged_bank_account].value = 0
     socket.emit("Get_Input", global_dispatcher);
   }
   else {
@@ -321,11 +407,28 @@ socket.on("global_cancel", function(input){
     socket.emit("Get_Input",page_file[1]);
   });
   socket.on("bank_register", function() {
-    account_name = Math.floor(Math.random()*100000000);
-    data.global.bankaccounts[account_name] = 0;
+    account_name = Register_Bank_Account();
+    data.players[socket.id].bank_details = account_name
     socket.emit("broadcast","created account: " + account_name + "\nit is highly recommended that you save this number keep it private");
     socket.emit("Get_Input",global_dispatcher);
   });
+//Contract Broker Functions
+socket.on("contract_take", function(input) {
+  if(Object.keys(data.missions).includes(input.argument) && data.missions[input.argument].owner == null) {
+    data.missions[input.argument].owner = socket.id
+    socket.emit("broadcast", "Contract Claimed");
+    socket.emit("Get_Input",global_dispatcher);
+  }
+  else {
+    socket.emit("broadcast", "Invalid Contract")
+    socket.emit("Get_Input", {claim:"contract_take",cancel:"global_cancel"});
+  }
+});
+
+
+
+
+
 //server control functions - this probably needs some kind of authentication or something cause otherwise this might be the big bad
 //also once functions can occure once per contorl connection which might do some weird shit --> yep it does do wierd shit so this could be problematic
   socket.on('control_data', function(input){
