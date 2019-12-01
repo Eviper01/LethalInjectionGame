@@ -28,5 +28,7 @@ try:
             Get_Input(dispatcher)
 
     io.connect("http://localhost:25444")
+    io.wait()
 except:
+    print("error")
     io.disconnect()
