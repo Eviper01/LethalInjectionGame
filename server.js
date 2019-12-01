@@ -67,7 +67,8 @@ var global_dispatcher = {  "help":"help",
                             "run":"run",
                             "bankinfo":"bank_details",
                             "contract": "contract_details",
-                            "data":"control_data"}
+                            "data":"control_data",
+                            "debug":"control_debug"}
 var data = {};
 function init_database() {
   data["players"] = {};
@@ -112,9 +113,8 @@ function generate_bank() {
 
 //Contract Broker methods
 
-//spooky behvaiour when it comes to contract payouts
 function Generate_Robbery_Mission() {
-  var target = Generate_Random_AI_Bank_Account();
+  target = Generate_Random_AI_Bank_Account();
   reward = random_normal(1200,250,1000);
   mission_id = Math.floor(Math.random()*100000000);
   mission_object = {
@@ -127,11 +127,13 @@ function Generate_Robbery_Mission() {
     },
     contract_payout: function() {
       try {
-        // need to delete the contract on completion - this is so fucking bugged
       owner = data.missions[this.mission_id].owner;
-      data.players[owner].alert("Mission Sucessful, Transfering: $" + this.reward + " to account " + data.players[owner].bank_details);
-      data.global.bankaccounts[data.players[owner].bank_details].value += this.reward;
-      data.players[owner].log.push(owner + " Recieved $" + this.reward + " into account: " + data.players[owner].bank_details)
+      reward = data.missions[this.mission_id].reward;
+      console.log(this.mission_id);
+      //this.methods are fing this up
+      data.players[owner].alert("Mission Sucessful, Transfering: $" + reward + " to account " + data.players[owner].bank_details);
+      data.global.bankaccounts[data.players[owner].bank_details].value += reward;
+      data.players[owner].log.push(owner + " Recieved $" + reward + " into account: " + data.players[owner].bank_details)
       delete data.missions[this.mission_id];}
       catch (e) {
         console.log("Contract expired due to completion by non owner");
@@ -142,7 +144,12 @@ function Generate_Robbery_Mission() {
   }
     }
   data.missions[mission_id] = mission_object;
-  data.global.bankaccounts[target].registerListener(function(){data.missions[mission_id].contract_payout()});
+  //this is a little bit wacky
+  data.global.bankaccounts[target].registerListener(function(val, miss_id){
+  if (val == 0){
+  //gotta find a way to find which contract this belongs to
+  data.missions[miss_id].contract_payout()}
+}, mission_id);
 }
 function Generate_Transfer_Mission() {
   //create two accounts
@@ -162,13 +169,14 @@ function Register_Bank_Account(balance=0) {
                 vListener: function(param) {},
                 set value(val) {
                   this.vInternal = val
-                  this.vListener(val);
+                  this.vListener(val,this.mission_id);
                 },
                 get value() {
                   return this.vInternal;
                 },
-                registerListener: function(listener) {
+                registerListener: function(listener, mission_id=0) {
                   this.vListener = listener
+                  this.mission_id = mission_id
                 },
 
         }
@@ -293,7 +301,7 @@ io.on('connect', function(socket) {
     socket.emit("Get_Input",global_dispatcher);
   });
   socket.on('clear_logs', function(input){
-    socket.emit("broadcast", "Clearing Logs");
+    socket.emit("broadcast", "Clearing Logs...");
     setTimeout(function() {data.players[data.players[socket.id].connection].clear_log();
                           socket.emit("broadcast", "success");
                           socket.emit("Get_Input",global_dispatcher);},1500);
@@ -433,6 +441,10 @@ socket.on("contract_take", function(input) {
 //also once functions can occure once per contorl connection which might do some weird shit --> yep it does do wierd shit so this could be problematic
   socket.on('control_data', function(input){
     console.log(data);
+    socket.emit("Get_Input",global_dispatcher);
+  });
+
+  socket.on('control_debug', function(input){
     socket.emit("Get_Input",global_dispatcher);
   });
 

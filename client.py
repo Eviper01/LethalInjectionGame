@@ -1,6 +1,5 @@
 import socketio
 try:
-    print("imported")
     io = socketio.Client()
     @io.event
     def connect():
@@ -14,7 +13,7 @@ try:
     def broadcast(info):
         print(info)
     @io.event
-    #might want to add client side help like: --> if help --> list dispatcher --> call Get_Input(dispatcher) 
+    #might want to add client side help like: --> if help --> list dispatcher --> call Get_Input(dispatcher)
     def Get_Input(dispatcher):
         command = input()
         instruction = command.partition(' ')[0]
