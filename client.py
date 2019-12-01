@@ -1,5 +1,6 @@
 import socketio
 try:
+    ip = open("server.txt", "r")
     io = socketio.Client()
     @io.event
     def connect():
@@ -27,7 +28,7 @@ try:
             print("Invalid Input")
             Get_Input(dispatcher)
 
-    io.connect("http://localhost:25444")
+    io.connect(ip.read())
     io.wait()
 except:
     print("error")
