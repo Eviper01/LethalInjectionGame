@@ -16,6 +16,7 @@ try:
     @io.event
     #might want to add client side help like: --> if help --> list dispatcher --> call Get_Input(dispatcher)
     def Get_Input(dispatcher):
+        #convert this to lowercase
         command = input()
         instruction = command.partition(' ')[0]
         try:
