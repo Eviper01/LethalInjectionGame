@@ -73,7 +73,8 @@ var global_dispatcher = {  "help":"help",
                             "bankinfo":"bank_details",
                             "contract": "contract_details",
                             "data":"control_data",
-                            "debug":"control_debug"}
+                            "debug":"control_debug",
+                            "files":"list_files"}
 var data = {};
 function init_database() {
   data["players"] = {};
@@ -328,6 +329,13 @@ io.on('connect', function(socket) {
       },
       alert: function(message) {
         socket.emit("broadcast",message);
+      },
+      list_files: function(){
+        string = "*****";
+        for (i in Object.keys(this.files)){
+          string = string + "\n" + Object.keys(this.files)[i];
+        };
+        return string;
       }
     };
     data.players[socket.id] = player;
@@ -336,7 +344,7 @@ io.on('connect', function(socket) {
   });
 
   socket.on('help', function(input){
-    var info = "these are some commands {logs, clearlogs, editlogs, run, connect, disconnect, index, ip} \nconnect to the whois for ip information";
+    var info = "these are some commands: " + Object.keys(global_dispatcher).toString();
     socket.emit("broadcast", info);
     socket.emit("Get_Input",global_dispatcher);
   });
@@ -409,6 +417,12 @@ io.on('connect', function(socket) {
   socket.on("contract_details", function(input) {
     socket.emit("broadcast", "can't really help you there dawg");
     socket.emit("Get_Input",global_dispatcher);
+
+  });
+
+  socket.on("list_files", function(input) {
+    socket.emit("broadcast",data.players[socket.id].list_files());
+    socket.emit("Get_Input", global_dispatcher);
 
   });
 
